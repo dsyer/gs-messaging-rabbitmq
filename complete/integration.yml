@@ -1,0 +1,23 @@
+version: "2"
+
+services:
+  rabbitmq:
+    image: rabbitmq:management-alpine
+    ports:
+    - "5672:5672"
+    - "15672:15672"
+
+  test:
+    image: springio/spring-ci-base
+    volumes:
+    - ".:/source"
+    depends_on:
+    - rabbitmq
+    environment:
+    - SPRING_RABBITMQ_HOST=rabbitmq
+    entrypoint:
+    - /bin/sh
+    - -exc
+    - |
+      cd /source
+      ./mvnw install -Dmaven.repo.local=../.m2

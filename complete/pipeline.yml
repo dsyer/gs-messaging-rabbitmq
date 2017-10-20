@@ -1,0 +1,56 @@
+# fly --target spring-guides login --concourse-url https://ci.spring.io --team-name spring-guides
+# fly --target spring-guides set-pipeline --config pipeline.yml --pipeline gs-messaging-rabbit
+---
+resources:
+- name: rabbit
+  type: docker-image
+  source:
+    repository: rabbitmq
+    tag: management-alpine
+- name: spring-ci-base
+  type: docker-image
+  source:
+    repository: springio/spring-ci-base
+- name: gs-messaging-rabbitmq
+  type: git
+  source:
+    uri: https://github.com/dsyer/gs-messaging-rabbitmq.git
+
+jobs:
+- name: maven
+  plan:
+  - aggregate:
+    - get: gs-messaging-rabbitmq
+      trigger: true
+    - get: spring-ci-base
+      trigger: true
+    - get: rabbit
+      params: {save: true}
+  - task: build
+    input_mapping:
+      source: gs-messaging-rabbitmq
+    privileged: true
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source:
+          repository: josebarn/dcind
+      inputs:
+        - name: rabbit
+        - name: source
+      caches:
+        - path: source/.m2
+      run:
+        dir: source/complete
+        path: sh
+        args:
+        - -exc
+        - |
+          source /docker-lib.sh
+          start_docker
+          docker-compose -f integration.yml run test
+          docker-compose -f integration.yml down
+          docker volume rm $(docker volume ls -q)
+      params:
+        TERM: dumb
